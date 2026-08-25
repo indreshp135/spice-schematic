@@ -2,6 +2,8 @@
 
 Turn a SPICE netlist into a schematic — as a React component, or as a plain SVG string with no DOM in sight.
 
+**[Try it in the browser →](https://indreshp135.github.io/SPICE-res/)** — paste a netlist, watch it draw, download the SVG.
+
 ```bash
 npm install spice-res
 ```
@@ -123,6 +125,9 @@ npm run build
 npm test        # 39 tests: parsing, geometry, serialisation, SSR
 npm run demo    # Vite playground — paste a netlist, watch it draw
 ```
+
+The playground is published to GitHub Pages from the `gh-pages` branch.
+Rebuild and republish it with `./scripts/deploy-pages.sh`.
 
 ## License
 
