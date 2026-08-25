@@ -1,0 +1,6 @@
+* Lossless transmission line
+V1 src 0 PULSE(0 1 0 100p 100p 5n 10n)
+RS src in 50
+T1 in 0 out 0 Z0=50 TD=2n
+RT out 0 50
+.end

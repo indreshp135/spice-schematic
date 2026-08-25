@@ -89,6 +89,7 @@ function ShapeMark({
           strokeWidth={t.strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
+          strokeDasharray={s.dashed ? '5 4' : undefined}
           {...handlers}
         />
       );

@@ -1,0 +1,14 @@
+* Dependent sources
+VIN in 0 AC 1
+RIN in 0 1meg
+E1 e 0 in 0 10
+G1 g 0 in 0 1m
+RG g 0 1k
+VS s 0 DC 0
+F1 f 0 VS 2
+RF f 0 1k
+H1 h 0 VS 100
+RH h 0 1k
+B1 b 0 V=V(in)*V(in)
+RB b 0 1k
+.end

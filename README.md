@@ -41,16 +41,51 @@ The React entry is a separate export, so importing `spice-res` on a server never
 
 ## What it draws
 
-| Prefix | Element | Symbol |
-| --- | --- | --- |
-| `R` `C` `L` | resistor, capacitor, inductor | zig-zag, parallel plates, arc coil |
-| `V` `I` | independent sources | circle with polarity marks or a current arrow |
-| `D` | diode | triangle and bar, oriented by node order |
-| `Q` | BJT | vertical, arrow on the emitter, PNP detected from the model name |
-| `M` `J` | MOSFET, JFET | vertical, optional bulk terminal |
-| `X` | subcircuit call | labelled block, pins down the left edge |
+**All 26 SPICE element types.** A device's type is the first character of its
+refdes, so A–Z is the entire element universe — this table is exhaustive by
+construction rather than by best effort, and `test/coverage.test.js` asserts
+every letter parses and draws.
 
-Line continuations (`+`), comments, and `.directives` are handled. `.subckt`/`.ends` and `.control`/`.endc` bodies are skipped — their contents are definitions and commands, not circuit elements, and drawing them invents nets that do not exist. Anything the parser cannot place is reported in `skipped` rather than dropped in silence.
+| Letter | Device | Drawn as |
+| --- | --- | --- |
+| `A` | XSPICE code model | labelled block |
+| `B` | behavioural source | diamond |
+| `C` | capacitor | two-terminal symbol |
+| `D` | diode | two-terminal symbol |
+| `E` | VCVS | diamond |
+| `F` | CCCS | diamond |
+| `G` | VCCS | diamond |
+| `H` | CCVS | diamond |
+| `I` | current source | circle with polarity or current arrow |
+| `J` | JFET | vertical transistor |
+| `K` | coupled inductors | annotation (no nodes) |
+| `L` | inductor | two-terminal symbol |
+| `M` | MOSFET | vertical transistor |
+| `N` | numerical device | labelled block |
+| `O` | lossy transmission line | labelled block |
+| `P` | coupled multiconductor | labelled block |
+| `Q` | BJT | vertical transistor |
+| `R` | resistor | two-terminal symbol |
+| `S` | voltage-controlled switch | switch contacts and lever |
+| `T` | lossless transmission line | labelled block |
+| `U` | distributed RC line | labelled block |
+| `V` | voltage source | circle with polarity or current arrow |
+| `W` | current-controlled switch | switch contacts and lever |
+| `X` | subcircuit call | labelled block |
+| `Y` | lossy line (TXL) | labelled block |
+| `Z` | MESFET | vertical transistor |
+
+Voltage-controlled devices (`E`, `G`, `S`) carry sense nodes in addition to their
+terminals; those are drawn as **dashed** leads so a control connection is never
+mistaken for a current-carrying wire. Current-controlled devices (`F`, `H`, `W`)
+name a controlling source instead, and `K` has no nodes at all — it links two
+inductors, so it renders as an annotation rather than a symbol on a rail.
+
+Line continuations (`+`), comments, and `.directives` are handled.
+`.subckt`/`.ends` and `.control`/`.endc` bodies are skipped — their contents are
+definitions and commands, not circuit elements, and drawing them invents nets
+that do not exist. Anything the parser cannot place is reported in `skipped`
+rather than dropped in silence.
 
 ## How the layout works
 
@@ -110,19 +145,27 @@ const svg = sceneToSvg(scene);
 
 ## More examples
 
-`examples/` holds the netlists below and their rendered SVGs. Regenerate with `npm run examples`.
+`examples/` holds these netlists and their rendered SVGs. Regenerate with `npm run examples`.
 
 | | |
 | --- | --- |
 | <img src="docs/rc-lowpass.png" width="380"> | <img src="docs/cmos-inverter.png" width="380"> |
 | `rc-lowpass.cir` | `cmos-inverter.cir` |
+| <img src="docs/dependent-sources.png" width="380"> | <img src="docs/switches.png" width="380"> |
+| `dependent-sources.cir` — E, F, G, H, B | `switches.cir` — S and W |
+| <img src="docs/transformer.png" width="380"> | <img src="docs/transmission-line.png" width="380"> |
+| `transformer.cir` — K coupled inductors | `transmission-line.cir` — T |
+
+`all-elements.cir` is a coverage sheet rather than a circuit: one card of every
+letter A–Z, with no shared nets. It is deliberately sparse — 26 unconnected
+devices means 26 rails and 26 rows — and exists to prove every symbol draws.
 
 ## Development
 
 ```bash
 npm install
 npm run build
-npm test        # 39 tests: parsing, geometry, serialisation, SSR
+npm test        # 99 tests, incl. all 26 element types
 npm run demo    # Vite playground — paste a netlist, watch it draw
 ```
 

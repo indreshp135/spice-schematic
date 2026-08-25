@@ -32,7 +32,9 @@ export function sceneToSvg(scene: Scene, options: SvgOptions = {}): string {
         parts.push(
           s.filled
             ? `<path d="${s.d}" fill="${colourOf(s, t.ink)}"/>`
-            : `<path d="${s.d}" fill="none" stroke="${colourOf(s, t.ink)}" stroke-width="${t.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`,
+            : `<path d="${s.d}" fill="none" stroke="${colourOf(s, t.ink)}" stroke-width="${t.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"` +
+              (s.dashed ? ' stroke-dasharray="5 4"' : '') +
+              `/>`,
         );
         break;
       case 'circle':

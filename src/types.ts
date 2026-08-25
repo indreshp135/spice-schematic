@@ -1,5 +1,6 @@
-/** Component classes this library knows how to draw. */
-export type ComponentType = 'R' | 'C' | 'L' | 'V' | 'I' | 'D' | 'Q' | 'M' | 'J' | 'X';
+import type { ComponentType } from './elements.js';
+
+export type { ComponentType };
 
 /** One element card from the netlist. */
 export interface SpiceComponent {
@@ -8,6 +9,11 @@ export interface SpiceComponent {
   type: ComponentType;
   /** Connected net names, in SPICE pin order. */
   nodes: string[];
+  /** Control nets of a voltage-controlled device (E, G, S). */
+  senseNodes?: string[];
+  /** Names of other elements this card refers to — a controlling source
+   *  (F, H, W) or the two inductors a coupling links (K). */
+  refs?: string[];
   /** Value or model name — `1k`, `DC 5`, `2N3904`. May be empty. */
   value: string;
   /** The source line, with continuations already joined. */
@@ -39,7 +45,7 @@ interface Base {
 }
 
 export type Shape =
-  | (Base & { kind: 'path'; d: string; filled?: boolean })
+  | (Base & { kind: 'path'; d: string; filled?: boolean; dashed?: boolean })
   | (Base & { kind: 'circle'; cx: number; cy: number; r: number; filled?: boolean })
   | (Base & { kind: 'rect'; x: number; y: number; w: number; h: number })
   | (Base & {

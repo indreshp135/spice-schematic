@@ -1,0 +1,10 @@
+* Voltage and current controlled switches
+V1 supply 0 DC 5
+VCTRL ctrl 0 PULSE(0 5 0 1n 1n 1u 2u)
+S1 supply load ctrl 0 SWMOD
+RLOAD load 0 1k
+VSENSE sense 0 DC 0
+W1 supply alt VSENSE CSWMOD
+RALT alt 0 2k
+.model SWMOD SW vt=2.5 ron=1 roff=1meg
+.end

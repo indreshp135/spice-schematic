@@ -76,11 +76,12 @@ test('subcircuit call takes every field before the model name as a node', () => 
   assert.equal(x.value, 'OPAMP');
 });
 
-test('reports unsupported and malformed lines instead of dropping them silently', () => {
-  const r = parseSpice('E1 a b c d 2.0\nR1\nR2 a 0 1k');
+test('reports malformed lines instead of dropping them silently', () => {
+  const r = parseSpice('123 a b c\nR1\nR2 a 0 1k');
   assert.equal(r.components.length, 1);
   assert.equal(r.skipped.length, 2);
-  assert.match(r.skipped[0].reason, /no symbol/);
+  assert.match(r.skipped[0].reason, /not a SPICE element letter/);
+  assert.match(r.skipped[1].reason, /resistor: expected 2 nodes/);
 });
 
 test('survives garbage without throwing', () => {

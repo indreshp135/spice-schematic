@@ -3,6 +3,8 @@ export { layout } from './layout.js';
 export { sceneToSvg, renderToSvgString } from './svg.js';
 export type { SvgOptions } from './svg.js';
 export { defaultTheme } from './types.js';
+export { ELEMENTS, isElementType } from './elements.js';
+export type { ElementSpec, SymbolKind, CardShape } from './elements.js';
 export type {
   ComponentType,
   ParseResult,

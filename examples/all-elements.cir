@@ -1,0 +1,29 @@
+* All 26 SPICE element types
+VS in 0 DC 5
+R1 r1a r1b 1k
+C1 c1a c1b 100n
+L1 l1a l1b 10m
+L2 l2a l2b 5m
+K1 L1 L2 0.99
+D1 d1a d1b 1N4148
+Q1 qc qb qe 2N3904
+M1 md mg ms mb NMOS
+J1 jd jg js 2N3819
+Z1 zd zg zs mesmod
+E1 eout 0 in 0 10
+G1 gout 0 in 0 1m
+F1 fout 0 VS 2
+H1 hout 0 VS 100
+B1 bout 0 V=V(in)*2
+S1 sout 0 ctrl 0 swmod
+W1 wout 0 VS swmod
+T1 t1a 0 t1b 0 Z0=50 TD=1n
+O1 o1a 0 o1b 0 lossyline
+Y1 y1a 0 y1b 0 txlmod
+U1 u1a u1b 0 urcmod L=1m
+P1 pi1 pi2 0 po1 po2 0 cplmod
+X1 x1a x1b x1c opamp
+A1 in out amp
+N1 n1a n1b mynum
+I1 i1a 0 DC 1m
+.end

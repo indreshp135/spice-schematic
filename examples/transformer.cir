@@ -1,0 +1,7 @@
+* Coupled inductor transformer
+V1 pri 0 SIN(0 12 50)
+L1 pri 0 10m
+L2 sec 0 2.5m
+K1 L1 L2 0.98
+RL sec 0 100
+.end

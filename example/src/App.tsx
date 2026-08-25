@@ -1,7 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Schematic } from 'spice-res/react';
-import { renderToSvgString } from 'spice-res';
+import { parseSpice, renderToSvgString } from 'spice-res';
 import type { ParseResult } from 'spice-res';
+
+// Pulled straight from examples/ at build time, so the demo and the repo can
+// never drift apart.
+const RAW = import.meta.glob('../../examples/*.cir', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
@@ -12,6 +16,18 @@ R1 in out 1k
 C1 out 0 100n`;
 
 export function App() {
+  const examples = useMemo(
+    () =>
+      Object.entries(RAW)
+        .map(([path, text]) => ({
+          file: path.split('/').pop()!,
+          label: parseSpice(text).title ?? path.split('/').pop()!.replace('.cir', ''),
+          text,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [],
+  );
+
   const [netlist, setNetlist] = useState('');
   const [parsed, setParsed] = useState<ParseResult | null>(null);
   const [hot, setHot] = useState<string | null>(null);
@@ -33,6 +49,23 @@ export function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: MONO, margin: 0 }}>
       <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#1e2126' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 10, borderBottom: '1px solid #2c3038' }}>
+          {examples.map((ex) => (
+            <button
+              key={ex.file}
+              onClick={() => setNetlist(ex.text)}
+              title={ex.file}
+              style={{
+                padding: '4px 8px', fontSize: 10, fontFamily: MONO, cursor: 'pointer',
+                border: '1px solid #3a3f49', borderRadius: 2,
+                background: netlist === ex.text ? '#2f5da8' : 'transparent',
+                color: netlist === ex.text ? '#fff' : '#9aa0aa',
+              }}
+            >
+              {ex.label}
+            </button>
+          ))}
+        </div>
         <textarea
           value={netlist}
           onChange={(e) => setNetlist(e.target.value)}

@@ -1,3 +1,4 @@
+import { ELEMENTS } from './elements.js';
 import { isGround } from './parse.js';
 import type { ParseResult, Scene, Shape, SpiceComponent } from './types.js';
 
@@ -53,8 +54,41 @@ function orderNets(components: SpiceComponent[]): string[] {
   return ordered;
 }
 
-/** Symbol geometry for a horizontal two-terminal part, centred on the origin. */
-function twoTerminalBody(type: string, flip: boolean): { half: number; paths: string[]; solid?: string } {
+/** Symbol geometry for a horizontal part, centred on the origin. */
+function horizontalBody(type: string, flip: boolean): { half: number; paths: string[]; solid?: string } {
+  const kind = ELEMENTS[type as keyof typeof ELEMENTS]?.symbol;
+
+  if (kind === 'dependent') {
+    // Dependent sources take a diamond; voltage types carry polarity marks,
+    // current types an arrow, following the usual SPICE drawing convention.
+    const current = type === 'F' || type === 'G';
+    const px = flip ? 6 : -6;
+    const mx = flip ? -6 : 6;
+    return {
+      half: 16,
+      paths: [
+        'M -16 0 L 0 -13 L 16 0 L 0 13 Z',
+        ...(current
+          ? [`M ${mx} 0 L ${px} 0`]
+          : [`M ${px - 3} 0 L ${px + 3} 0 M ${px} -3 L ${px} 3`, `M ${mx - 3} 0 L ${mx + 3} 0`]),
+      ],
+      solid: current ? `M ${px} 0 l ${flip ? 5 : -5} -3.5 l 0 7 Z` : undefined,
+    };
+  }
+
+  if (kind === 'switch') {
+    return {
+      half: 16,
+      paths: [
+        'M -16 0 L -10 0',
+        'M 10 0 L 16 0',
+        'M -9 -1 L 9 -9', // the lever, drawn open
+        'M -10 0 a 2.4 2.4 0 1 0 0.1 0',
+        'M 9.9 0 a 2.4 2.4 0 1 0 0.1 0',
+      ],
+    };
+  }
+
   switch (type) {
     case 'R':
       return { half: 24, paths: ['M -24 0 L -19 -9 L -11 9 L -3 -9 L 5 9 L 13 -9 L 19 9 L 24 0'] };
@@ -76,8 +110,11 @@ function twoTerminalBody(type: string, flip: boolean): { half: number; paths: st
 
 /** Row height reserved for a component. */
 function rowHeight(c: SpiceComponent): number {
-  if (c.type === 'X') return Math.max(96, 44 + c.nodes.length * 26);
-  return 'QMJ'.includes(c.type) ? 138 : 88;
+  const kind = ELEMENTS[c.type].symbol;
+  if (kind === 'coupling') return 46;
+  if (kind === 'block') return Math.max(96, 44 + c.nodes.length * 26);
+  if (kind === 'transistor') return 138;
+  return c.senseNodes?.length ? 132 : 88; // sense leads need room below the symbol
 }
 
 /**
@@ -117,11 +154,25 @@ export function layout(parsed: ParseResult): Scene {
   let maxX = MARGIN_L + Math.max(0, nets.length - 1) * COL;
 
   for (const c of parsed.components) {
+    const kind = ELEMENTS[c.type].symbol;
     const h = rowHeight(c);
     const cy = y + h / 2;
 
+    /* ── coupled inductors: no nodes at all, so it gets an annotation row ── */
+    if (kind === 'coupling') {
+      const [a, b] = c.refs ?? [];
+      labels.push({ kind: 'text', x: MARGIN_L - 8, y: cy, text: c.refdes, anchor: 'start', size: 12, bold: true });
+      labels.push({
+        kind: 'text', x: MARGIN_L + 34, y: cy,
+        text: `${a ?? '?'} \u2194 ${b ?? '?'}${c.value ? `  k=${c.value}` : ''}`,
+        anchor: 'start', size: 11, dim: true,
+      });
+      y += h;
+      continue;
+    }
+
     /* ── two-terminal, drawn horizontally between its two rails ── */
-    if ('RCLVID'.includes(c.type)) {
+    if (kind === 'twoTerminal' || kind === 'source' || kind === 'dependent' || kind === 'switch') {
       const [a, b] = c.nodes;
       if (isGround(a) && isGround(b)) { y += h; continue; }
 
@@ -162,7 +213,7 @@ export function layout(parsed: ParseResult): Scene {
           );
         }
       } else {
-        const body = twoTerminalBody(c.type, flip);
+        const body = horizontalBody(c.type, flip);
         wire(`M ${lo} ${cy} L ${cx - body.half} ${cy}`);
         wire(`M ${cx + body.half} ${cy} L ${hi} ${cy}`);
         if (body.solid) symbols.push({ kind: 'path', d: translate(body.solid, cx, cy), filled: true });
@@ -173,14 +224,41 @@ export function layout(parsed: ParseResult): Scene {
       if (isGround(b)) groundSymbol(xb, cy, b); else pin(b, xb, cy);
       maxX = Math.max(maxX, xa, xb);
 
+      // Voltage-controlled devices sense a second node pair. Drawn dashed so a
+      // control connection is never mistaken for a current-carrying wire.
+      (c.senseNodes ?? []).forEach((net, i) => {
+        const stubX = cx + (i === 0 ? -6 : 6);
+        const ry = cy + 32 + i * 12;
+        if (isGround(net)) {
+          wires.push({ kind: 'path', d: `M ${stubX} ${cy + 14} L ${stubX} ${ry}`, dashed: true, net });
+          groundSymbol(stubX, ry, net);
+        } else {
+          wires.push({
+            kind: 'path',
+            d: `M ${stubX} ${cy + 14} L ${stubX} ${ry} L ${xOf(net)} ${ry}`,
+            dashed: true,
+            net,
+          });
+          pin(net, xOf(net), ry);
+          maxX = Math.max(maxX, xOf(net));
+        }
+      });
+
       refdesLabel(cx, cy - (isSource ? 26 : 18), c.refdes);
-      if (c.value) valueLabel(cx, cy + (isSource ? 36 : 28), truncate(c.value, 22));
+      // A current-controlled device names its controlling source; show it.
+      const caption = c.refs?.length ? `${c.refs[0]}${c.value ? ` \u00d7 ${c.value}` : ''}` : c.value;
+      if (caption) {
+        // Sense leads occupy the space below the symbol, so the value moves
+        // out to the right rather than colliding with them.
+        if (c.senseNodes?.length) valueLabel(cx + 22, cy + 4, truncate(caption, 16), 'start');
+        else valueLabel(cx, cy + (isSource ? 36 : 28), truncate(caption, 22));
+      }
       y += h;
       continue;
     }
 
     /* ── three/four-terminal devices, drawn vertically ── */
-    if ('QMJ'.includes(c.type)) {
+    if (kind === 'transistor') {
       const [drain, gate, source] = c.nodes;
       const live = c.nodes.slice(0, 3).filter((n) => !isGround(n)).map(xOf);
       const cx = (live.length ? live.reduce((s, v) => s + v, 0) / live.length : MARGIN_L) + 34;
