@@ -1,0 +1,6 @@
+* CMOS inverter
+VDD vdd 0 DC 3.3
+M1 out in vdd vdd PMOS W=2u L=180n
+M2 out in 0 0 NMOS W=1u L=180n
+C1 out 0 10f
+.end

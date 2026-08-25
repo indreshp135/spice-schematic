@@ -1,0 +1,72 @@
+{
+  "name": "spice-res",
+  "version": "0.1.0",
+  "description": "Turn a SPICE netlist into a schematic — as a React component or a standalone SVG string.",
+  "keywords": [
+    "spice",
+    "netlist",
+    "schematic",
+    "svg",
+    "react",
+    "circuit",
+    "eda",
+    "ngspice"
+  ],
+  "license": "MIT",
+  "author": "indreshp135",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indreshp135/SPICE-res.git"
+  },
+  "homepage": "https://github.com/indreshp135/SPICE-res#readme",
+  "bugs": "https://github.com/indreshp135/SPICE-res/issues",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test test/*.test.js",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "examples": "node scripts/gen-examples.mjs",
+    "demo": "npm --prefix example install && npm --prefix example run dev"
+  },
+  "peerDependencies": {
+    "react": ">=17"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,9 @@
+* Common emitter amplifier
+VCC vcc 0 DC 12
+R1 vcc b 100k
+R2 b 0 22k
+RC vcc c 4.7k
+RE e 0 1k
+Q1 c b e 2N3904
+C1 in b 10u
+.end
