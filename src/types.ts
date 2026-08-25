@@ -45,9 +45,9 @@ interface Base {
 }
 
 export type Shape =
-  | (Base & { kind: 'path'; d: string; filled?: boolean; dashed?: boolean })
-  | (Base & { kind: 'circle'; cx: number; cy: number; r: number; filled?: boolean })
-  | (Base & { kind: 'rect'; x: number; y: number; w: number; h: number })
+  | (Base & { kind: 'path'; d: string; filled?: boolean; dashed?: boolean; isHalo?: boolean })
+  | (Base & { kind: 'circle'; cx: number; cy: number; r: number; filled?: boolean; isHalo?: boolean })
+  | (Base & { kind: 'rect'; x: number; y: number; w: number; h: number; isHalo?: boolean })
   | (Base & {
       kind: 'text';
       x: number;

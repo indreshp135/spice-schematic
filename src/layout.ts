@@ -248,9 +248,9 @@ export function layout(parsed: ParseResult): Scene {
       // A current-controlled device names its controlling source; show it.
       const caption = c.refs?.length ? `${c.refs[0]}${c.value ? ` \u00d7 ${c.value}` : ''}` : c.value;
       if (caption) {
-        // Sense leads occupy the space below the symbol, so the value moves
-        // out to the right rather than colliding with them.
-        if (c.senseNodes?.length) valueLabel(cx + 22, cy + 4, truncate(caption, 16), 'start');
+        // Sense leads run below the symbol and the terminal wire runs through
+        // it, so the value sits clear of both: right of the body, below the wire.
+        if (c.senseNodes?.length) valueLabel(cx + 20, cy + 20, truncate(caption, 16), 'start');
         else valueLabel(cx, cy + (isSource ? 36 : 28), truncate(caption, 22));
       }
       y += h;
@@ -380,7 +380,20 @@ export function layout(parsed: ParseResult): Scene {
     height: Math.max(y + MARGIN_B, MARGIN_T + 120),
     title: parsed.title,
     nets,
-    shapes: [...rails, ...wires, ...dots, ...grounds, ...symbols, ...labels],
+    // Symbols sit on a paper-coloured backing so a rail passing behind one is
+    // interrupted rather than appearing to terminate on it; junction dots stay
+    // the only mark meaning "connected". The whole backing is laid down as one
+    // layer before any symbol, otherwise each halo would erase the stroke drawn
+    // just before it and symbols would come apart.
+    shapes: [
+      ...rails,
+      ...wires,
+      ...dots,
+      ...grounds,
+      ...symbols.filter((s) => s.kind !== 'text').map((s) => ({ ...s, isHalo: true })),
+      ...symbols,
+      ...labels,
+    ],
   };
 }
 

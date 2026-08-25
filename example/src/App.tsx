@@ -1,40 +1,42 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Schematic } from 'spice-res/react';
-import { parseSpice, renderToSvgString } from 'spice-res';
-import type { ParseResult } from 'spice-res';
+import { useState } from 'react';
+import { Schematic, useSchematic } from 'spice-schematic/react';
+import { renderToSvgString } from 'spice-schematic';
+import { EXAMPLES } from './examples.js';
 
-// Pulled straight from examples/ at build time, so the demo and the repo can
-// never drift apart.
-const RAW = import.meta.glob('../../examples/*.cir', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-
-const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-
-const PLACEHOLDER = `paste a SPICE netlist
-
-V1 in 0 DC 5
+const PLACEHOLDER = `V1 in 0 DC 5
 R1 in out 1k
 C1 out 0 100n`;
 
+const ZOOMS = [0.35, 0.5, 0.75, 1, 1.5, 2];
+
+/** `?example=common-emitter` preloads that example, so links are shareable. */
+function fromUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const want = new URLSearchParams(window.location.search).get('example');
+  if (!want) return '';
+  return EXAMPLES.find((e) => e.file === want || e.file.replace(/\.cir$/, '') === want)?.text ?? '';
+}
+
 export function App() {
-  const examples = useMemo(
-    () =>
-      Object.entries(RAW)
-        .map(([path, text]) => ({
-          file: path.split('/').pop()!,
-          label: parseSpice(text).title ?? path.split('/').pop()!.replace('.cir', ''),
-          text,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [],
-  );
-
-  const [netlist, setNetlist] = useState('');
-  const [parsed, setParsed] = useState<ParseResult | null>(null);
+  const [netlist, setNetlist] = useState(fromUrl);
   const [hot, setHot] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [zoomIx, setZoomIx] = useState(3);
 
-  const onParse = useCallback((r: ParseResult) => setParsed(r), []);
-  const empty = !parsed?.components.length;
+  // Derived straight from the netlist. Nothing here may depend on state that
+  // only the schematic sets — that cycle is what stopped it ever rendering.
+  const { parsed, scene } = useSchematic(netlist);
+  const empty = parsed.components.length === 0;
+  const zoom = ZOOMS[zoomIx];
+
+  const load = (text: string, file?: string) => {
+    setNetlist(text);
+    setHot(null);
+    setZoomIx(3);
+    const url = new URL(window.location.href);
+    if (file) url.searchParams.set('example', file.replace(/\.cir$/, ''));
+    else url.searchParams.delete('example');
+    window.history.replaceState(null, '', url);
+  };
 
   const download = () => {
     const blob = new Blob([renderToSvgString(netlist)], { type: 'image/svg+xml' });
@@ -47,69 +49,105 @@ export function App() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: MONO, margin: 0 }}>
-      <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#1e2126' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 10, borderBottom: '1px solid #2c3038' }}>
-          {examples.map((ex) => (
-            <button
-              key={ex.file}
-              onClick={() => setNetlist(ex.text)}
-              title={ex.file}
-              style={{
-                padding: '4px 8px', fontSize: 10, fontFamily: MONO, cursor: 'pointer',
-                border: '1px solid #3a3f49', borderRadius: 2,
-                background: netlist === ex.text ? '#2f5da8' : 'transparent',
-                color: netlist === ex.text ? '#fff' : '#9aa0aa',
-              }}
-            >
-              {ex.label}
-            </button>
-          ))}
+    <div className="app">
+      <header className="header">
+        <div className="brand">
+          spice-schematic <span>· netlist to schematic</span>
         </div>
-        <textarea
-          value={netlist}
-          onChange={(e) => setNetlist(e.target.value)}
-          spellCheck={false}
-          placeholder={PLACEHOLDER}
-          style={{
-            flex: 1, resize: 'none', padding: 16, fontSize: 12, lineHeight: 1.7,
-            outline: 'none', border: 'none', background: 'transparent', color: '#d5d2c8', fontFamily: MONO,
-          }}
-        />
-        {parsed && parsed.skipped.length > 0 && (
-          <div style={{ padding: '0 16px 8px', fontSize: 11, color: '#8a7f66' }}>
-            {parsed.skipped.length} line{parsed.skipped.length > 1 ? 's' : ''} not drawn:{' '}
-            {parsed.skipped[0].reason}
+        <div className="spacer" />
+        {!empty && (
+          <div className="readout">
+            {hot ? (
+              <>
+                net <span className="net">{hot.toUpperCase()}</span>
+              </>
+            ) : (
+              <>
+                <b>{parsed.components.length}</b> parts · <b>{parsed.nets.length}</b> nets ·{' '}
+                <b>{new Set(parsed.components.map((c) => c.type)).size}</b> types
+              </>
+            )}
           </div>
         )}
-        <button
-          onClick={download}
-          disabled={empty}
-          style={{
-            margin: 12, padding: '8px 0', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
-            border: 'none', borderRadius: 2, background: '#2f5da8', color: '#fff',
-            opacity: empty ? 0.3 : 1, cursor: empty ? 'default' : 'pointer', fontFamily: MONO,
-          }}
-        >
+        <div className="zoom">
+          <button onClick={() => setZoomIx((i) => Math.max(0, i - 1))} disabled={empty || zoomIx === 0} title="Zoom out">
+            −
+          </button>
+          <span>{Math.round(zoom * 100)}%</span>
+          <button
+            onClick={() => setZoomIx((i) => Math.min(ZOOMS.length - 1, i + 1))}
+            disabled={empty || zoomIx === ZOOMS.length - 1}
+            title="Zoom in"
+          >
+            +
+          </button>
+        </div>
+        <button className="primary" onClick={download} disabled={empty}>
           Download SVG
         </button>
-      </div>
+      </header>
 
-      <div style={{ flex: 1, minWidth: 0, background: '#f4f2eb', overflow: 'auto' }}>
-        {empty ? (
-          <div style={{ height: '100%', display: 'grid', placeItems: 'center', fontSize: 12, color: '#8d8877' }}>
-            the schematic appears here
+      <div className="body">
+        <aside className="sidebar">
+          <div className="section-label">Examples</div>
+          <div className="examples">
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex.file}
+                className={`example${netlist === ex.text ? ' active' : ''}`}
+                onClick={() => load(ex.text, ex.file)}
+                title={ex.file}
+              >
+                <div className="name">{ex.label}</div>
+                <div className="meta">
+                  <span>{ex.parts} parts</span>
+                  <span className="letters">{ex.letters.join(' ')}</span>
+                </div>
+              </button>
+            ))}
           </div>
-        ) : (
-          <Schematic
-            ref={svgRef}
-            netlist={netlist}
-            onParse={onParse}
-            highlightNet={hot ?? undefined}
-            onNetHover={setHot}
-            style={{ width: '100%', height: '100%' }}
-          />
-        )}
+
+          <div className="editor-wrap">
+            <div className="section-label">Netlist</div>
+            <textarea
+              value={netlist}
+              onChange={(e) => setNetlist(e.target.value)}
+              spellCheck={false}
+              placeholder={PLACEHOLDER}
+            />
+            {parsed.skipped.length > 0 && (
+              <div className="status">
+                <div className="warn">
+                  {parsed.skipped.length} line{parsed.skipped.length > 1 ? 's' : ''} not drawn —{' '}
+                  <code>{parsed.skipped[0].reason}</code>
+                </div>
+              </div>
+            )}
+            <div className="actions">
+              <button onClick={() => load('')} disabled={!netlist}>
+                Clear
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <main className={`canvas${empty ? ' center' : ''}`}>
+          {empty ? (
+            <div className="empty">
+              Pick an example, or paste a netlist.
+              <br />
+              Hover any net to trace it — <kbd>R1 in out 1k</kbd>
+            </div>
+          ) : (
+            <Schematic
+              netlist={netlist}
+              highlightNet={hot ?? undefined}
+              onNetHover={setHot}
+              width={scene.width * zoom}
+              height={scene.height * zoom}
+            />
+          )}
+        </main>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-* All 26 SPICE element types
+* Every SPICE element type (A-Z)
 VS in 0 DC 5
 R1 r1a r1b 1k
 C1 c1a c1b 100n

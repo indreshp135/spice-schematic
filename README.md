@@ -1,11 +1,11 @@
-# spice-res
+# spice-schematic
 
 Turn a SPICE netlist into a schematic — as a React component, or as a plain SVG string with no DOM in sight.
 
 **[Try it in the browser →](https://indreshp135.github.io/SPICE-res/)** — paste a netlist, watch it draw, download the SVG.
 
 ```bash
-npm install spice-res
+npm install spice-schematic
 ```
 
 <p align="center">
@@ -17,7 +17,7 @@ npm install spice-res
 **As a React component**
 
 ```tsx
-import { Schematic } from 'spice-res/react';
+import { Schematic } from 'spice-schematic/react';
 
 export default function App() {
   return <Schematic netlist={`
@@ -31,13 +31,13 @@ export default function App() {
 **As an SVG string** — works in Node, a worker, a build step, anywhere:
 
 ```ts
-import { renderToSvgString } from 'spice-res';
+import { renderToSvgString } from 'spice-schematic';
 import { writeFileSync } from 'node:fs';
 
 writeFileSync('schematic.svg', renderToSvgString(netlist));
 ```
 
-The React entry is a separate export, so importing `spice-res` on a server never pulls React in.
+The React entry is a separate export, so importing `spice-schematic` on a server never pulls React in.
 
 ## What it draws
 
@@ -134,7 +134,7 @@ return <Schematic netlist={src} highlightNet={hot ?? undefined} onNetHover={setH
 ### Lower level
 
 ```ts
-import { parseSpice, layout, sceneToSvg } from 'spice-res';
+import { parseSpice, layout, sceneToSvg } from 'spice-schematic';
 
 const parsed = parseSpice(netlist);  // { title, components, nets, skipped }
 const scene = layout(parsed);        // { width, height, nets, shapes }
@@ -165,7 +165,7 @@ devices means 26 rails and 26 rows — and exists to prove every symbol draws.
 ```bash
 npm install
 npm run build
-npm test        # 99 tests, incl. all 26 element types
+npm test        # 152 tests: elements, geometry, SVG validity, demo UI
 npm run demo    # Vite playground — paste a netlist, watch it draw
 ```
 

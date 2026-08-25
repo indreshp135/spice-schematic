@@ -58,11 +58,25 @@ export const Schematic = React.forwardRef<SVGSVGElement, SchematicProps>(functio
                 style: { cursor: onNetClick ? 'pointer' : 'default' } as React.CSSProperties,
               }
             : undefined;
+        if (s.kind !== 'text' && s.isHalo) return <Halo key={i} shape={s} theme={t} />;
         return <ShapeMark key={i} shape={s} theme={t} hot={hot} handlers={handlers} />;
       })}
     </svg>
   );
 });
+
+/** Paper-coloured under-stroke that interrupts whatever passes behind a symbol. */
+function Halo({ shape: s, theme: t }: { shape: Shape; theme: Theme }) {
+  if (s.kind === 'text') return null;
+  const w = t.strokeWidth + 5;
+  if (s.kind === 'path') {
+    return <path d={s.d} fill="none" stroke={t.paper} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" />;
+  }
+  if (s.kind === 'circle') {
+    return <circle cx={s.cx} cy={s.cy} r={s.r} fill={s.filled ? t.paper : 'none'} stroke={t.paper} strokeWidth={w} />;
+  }
+  return <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={2} fill={t.paper} stroke={t.paper} strokeWidth={w} />;
+}
 
 function ShapeMark({
   shape: s,

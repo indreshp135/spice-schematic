@@ -8,8 +8,8 @@ export default defineConfig({
     alias: {
       // Point at source so the demo hot-reloads on library edits,
       // with no build or npm link step in between.
-      'spice-res/react': fileURLToPath(new URL('../src/react.tsx', import.meta.url)),
-      'spice-res': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
+      'spice-schematic/react': fileURLToPath(new URL('../src/react.tsx', import.meta.url)),
+      'spice-schematic': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
     },
   },
 });

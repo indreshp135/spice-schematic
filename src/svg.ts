@@ -26,7 +26,14 @@ export function sceneToSvg(scene: Scene, options: SvgOptions = {}): string {
   const colourOf = (s: Shape, base: string): string =>
     hot && s.net === hot ? t.accent : base;
 
+  const HALO = t.strokeWidth + 5;
   for (const s of scene.shapes) {
+    if (s.kind !== 'text' && s.isHalo) {
+      if (s.kind === 'path') parts.push(`<path d="${s.d}" fill="none" stroke="${t.paper}" stroke-width="${HALO}" stroke-linecap="round" stroke-linejoin="round"/>`);
+      else if (s.kind === 'circle') parts.push(`<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" fill="${s.filled ? t.paper : 'none'}" stroke="${t.paper}" stroke-width="${HALO}"/>`);
+      else parts.push(`<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="2" fill="${t.paper}" stroke="${t.paper}" stroke-width="${HALO}"/>`);
+      continue;
+    }
     switch (s.kind) {
       case 'path':
         parts.push(

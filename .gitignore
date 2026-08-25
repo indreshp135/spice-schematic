@@ -4,3 +4,5 @@ dist/
 .DS_Store
 .vite/
 example/dist/
+test/.app.bundle.mjs
+example/dist-local/
