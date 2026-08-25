@@ -92,6 +92,7 @@ rather than dropped in silence.
 A netlist records connectivity and nothing else. There are no coordinates in it, so a renderer has to invent a placement:
 
 - every net becomes a **vertical rail**, ordered by breadth-first walk from the first voltage source, so supply sits left and signal reads across the page
+- a rail only spans the rows between its first and last pin, so nets that cannot collide **share a column** — without this a deck of mostly-isolated devices is as wide as it is long, and almost entirely whitespace
 - every component gets its **own row**, drawn between the rails it connects
 - **ground gets no rail** — just a ground symbol at each pin, which removes what would otherwise be the busiest net on the sheet
 - **junction dots** appear only where a lead meets a rail mid-run, never at a rail's endpoints, so a dot always means a real T
@@ -157,8 +158,8 @@ const svg = sceneToSvg(scene);
 | `transformer.cir` — K coupled inductors | `transmission-line.cir` — T |
 
 `all-elements.cir` is a coverage sheet rather than a circuit: one card of every
-letter A–Z, with no shared nets. It is deliberately sparse — 26 unconnected
-devices means 26 rails and 26 rows — and exists to prove every symbol draws.
+letter A–Z. It exists to prove every symbol draws, and it is what column packing
+was built for — 50 nets fold into a handful of columns instead of 50.
 
 ## Development
 

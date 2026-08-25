@@ -54,6 +54,47 @@ function orderNets(components: SpiceComponent[]): string[] {
   return ordered;
 }
 
+/**
+ * Pack nets into columns.
+ *
+ * A net's rail only spans the rows between its first and last pin, so two nets
+ * whose row ranges do not overlap can share one column. Giving every net its
+ * own column instead makes a sheet as wide as the netlist is long — a deck of
+ * mostly-isolated devices ends up almost entirely whitespace.
+ *
+ * Nets are considered in reading order, so the well-connected ones still take
+ * the leftmost columns; only nets that genuinely cannot collide get folded in.
+ */
+function packColumns(components: SpiceComponent[], order: string[]): Map<string, number> {
+  const span = new Map<string, [number, number]>();
+  components.forEach((c, row) => {
+    for (const n of [...c.nodes, ...(c.senseNodes ?? [])]) {
+      if (isGround(n)) continue;
+      const cur = span.get(n);
+      if (cur) {
+        cur[0] = Math.min(cur[0], row);
+        cur[1] = Math.max(cur[1], row);
+      } else {
+        span.set(n, [row, row]);
+      }
+    }
+  });
+
+  const GAP = 1; // keep a clear row between two rails sharing a column
+  const columns: [number, number][][] = [];
+  const assigned = new Map<string, number>();
+
+  for (const net of order) {
+    const [a, b] = span.get(net) ?? [0, 0];
+    let k = 0;
+    while (k < columns.length && !columns[k].every(([s2, e2]) => b < s2 - GAP || a > e2 + GAP)) k++;
+    if (k === columns.length) columns.push([]);
+    columns[k].push([a, b]);
+    assigned.set(net, k);
+  }
+  return assigned;
+}
+
 /** Symbol geometry for a horizontal part, centred on the origin. */
 function horizontalBody(type: string, flip: boolean): { half: number; paths: string[]; solid?: string } {
   const kind = ELEMENTS[type as keyof typeof ELEMENTS]?.symbol;
@@ -124,7 +165,8 @@ function rowHeight(c: SpiceComponent): number {
  */
 export function layout(parsed: ParseResult): Scene {
   const nets = orderNets(parsed.components);
-  const colX = new Map(nets.map((n, i) => [n, MARGIN_L + i * COL] as const));
+  const column = packColumns(parsed.components, nets);
+  const colX = new Map([...column].map(([n, k]) => [n, MARGIN_L + k * COL] as const));
   const xOf = (net: string): number => colX.get(net) ?? MARGIN_L;
 
   const rails: Shape[] = [];
@@ -151,7 +193,8 @@ export function layout(parsed: ParseResult): Scene {
     labels.push({ kind: 'text', x, y, text, anchor, size: 11, dim: true });
 
   let y = MARGIN_T;
-  let maxX = MARGIN_L + Math.max(0, nets.length - 1) * COL;
+  const usedColumns = column.size ? Math.max(...column.values()) + 1 : 0;
+  let maxX = MARGIN_L + Math.max(0, usedColumns - 1) * COL;
 
   for (const c of parsed.components) {
     const kind = ELEMENTS[c.type].symbol;
@@ -245,8 +288,14 @@ export function layout(parsed: ParseResult): Scene {
       });
 
       refdesLabel(cx, cy - (isSource ? 26 : 18), c.refdes);
-      // A current-controlled device names its controlling source; show it.
-      const caption = c.refs?.length ? `${c.refs[0]}${c.value ? ` \u00d7 ${c.value}` : ''}` : c.value;
+      // A current-controlled device names its controlling source. For F and H
+      // the value is a gain, so it reads as a product; for W it is a model name,
+      // which multiplied by a source would be nonsense.
+      const caption = !c.refs?.length
+        ? c.value
+        : c.type === 'W'
+          ? `${c.value || 'switch'} \u00b7 ${c.refs[0]}`
+          : `${c.refs[0]}${c.value ? ` \u00d7 ${c.value}` : ''}`;
       if (caption) {
         // Sense leads run below the symbol and the terminal wire runs through
         // it, so the value sits clear of both: right of the body, below the wire.
