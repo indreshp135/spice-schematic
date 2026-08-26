@@ -35,6 +35,11 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js",
       "require": "./dist/react.cjs"
+    },
+    "./elk": {
+      "types": "./dist/elk.d.ts",
+      "import": "./dist/elk.js",
+      "require": "./dist/elk.cjs"
     }
   },
   "files": [
@@ -51,18 +56,24 @@
     "demo": "npm --prefix example install && npm --prefix example run dev"
   },
   "peerDependencies": {
-    "react": ">=17"
+    "react": ">=17",
+    "elkjs": ">=0.9"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "elkjs": {
       "optional": true
     }
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.7",
+    "elkjs": "^0.12.0",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
+    "netlistsvg": "^1.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsup": "^8.3.5",

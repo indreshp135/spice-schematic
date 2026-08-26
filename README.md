@@ -144,6 +144,61 @@ const svg = sceneToSvg(scene);
 
 `layout()` returns a flat list of tagged shapes — `path`, `circle`, `rect`, `text` — each carrying the net it belongs to where it belongs to one. Both renderers are thin passes over that list, so writing a third (canvas, PDF, a different JSX dialect) means walking one array. `useSchematic(netlist)` is the same thing as a hook.
 
+## Interop and alternative layouts
+
+### `toYosysJson(netlist, options?)`
+
+Emits [Yosys JSON](https://yosyshq.readthedocs.io/), so a SPICE deck can be fed
+to [netlistsvg](https://github.com/nturley/netlistsvg) or any Yosys-JSON tool:
+
+```ts
+import { toYosysJson } from 'spice-schematic';
+import netlistsvg from 'netlistsvg';
+
+const { json, dropped } = toYosysJson(netlist);
+const svg = await netlistsvg.render(analogSkin, json);
+```
+
+**Check `dropped`.** Yosys JSON is a digital format and netlistsvg's analog skin
+has symbols for seven SPICE letters — `R C L D V I Q`. There is no FET symbol at
+all, so a CMOS inverter loses both transistors. Nothing is omitted silently;
+every unrepresentable component is reported with a reason.
+
+Two things the format forces, both layout hints rather than facts about the
+circuit: analog pins have no direction, yet `port_directions` must be supplied
+and netlistsvg lays out along them; and the skin ships separate horizontal and
+vertical symbols, so orientation is the caller's choice too.
+
+### `layoutWithElk(parsed, options?)` — experimental
+
+An alternative layout over [ELK](https://github.com/kieler/elkjs)'s graph
+algorithms, in the optional `spice-schematic/elk` entry. `elkjs` is an optional
+peer dependency; importing the core never pulls it in.
+
+```ts
+import { parseSpice, sceneToSvg } from 'spice-schematic';
+import { layoutWithElk } from 'spice-schematic/elk';
+
+const svg = sceneToSvg(await layoutWithElk(parseSpice(netlist)));
+```
+
+**It is not the default, because measured against the rail layout it is worse.**
+On the common-emitter example it is smaller (436×653 against 754×832) but harder
+to read: junction dots end up on stubs, routed edges loop around the transistor,
+and net labels are gone. `force` and `stress` are worse still — they place well
+but route diagonally, and schematics need orthogonal wires.
+
+The cause is structural. ELK's `layered` algorithm orders nodes along a
+direction, and an analog circuit does not have one; a direction has to be
+invented per pin, and it drives the result. netlistsvg's good analog examples
+carry hand-authored directions and per-component orientations, which is
+placement supplied by a person rather than inferred.
+
+It is kept because it works, is tested, and proves the `Scene` seam takes a
+second engine — swapping layouts touched no parser, symbol or renderer code.
+Both layouts draw from `src/symbols.ts`, so a resistor is the same zigzag in
+either, and a test asserts it.
+
 ## More examples
 
 `examples/` holds these netlists and their rendered SVGs. Regenerate with `npm run examples`.

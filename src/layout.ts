@@ -1,5 +1,6 @@
 import { ELEMENTS } from './elements.js';
 import { isGround } from './parse.js';
+import { groundShapes, horizontalBody, sourceShapes, transistorShapes, truncate } from './symbols.js';
 import type { ParseResult, Scene, Shape, SpiceComponent } from './types.js';
 
 /** Horizontal distance between adjacent net rails. */
@@ -95,60 +96,6 @@ function packColumns(components: SpiceComponent[], order: string[]): Map<string,
   return assigned;
 }
 
-/** Symbol geometry for a horizontal part, centred on the origin. */
-function horizontalBody(type: string, flip: boolean): { half: number; paths: string[]; solid?: string } {
-  const kind = ELEMENTS[type as keyof typeof ELEMENTS]?.symbol;
-
-  if (kind === 'dependent') {
-    // Dependent sources take a diamond; voltage types carry polarity marks,
-    // current types an arrow, following the usual SPICE drawing convention.
-    const current = type === 'F' || type === 'G';
-    const px = flip ? 6 : -6;
-    const mx = flip ? -6 : 6;
-    return {
-      half: 16,
-      paths: [
-        'M -16 0 L 0 -13 L 16 0 L 0 13 Z',
-        ...(current
-          ? [`M ${mx} 0 L ${px} 0`]
-          : [`M ${px - 3} 0 L ${px + 3} 0 M ${px} -3 L ${px} 3`, `M ${mx - 3} 0 L ${mx + 3} 0`]),
-      ],
-      solid: current ? `M ${px} 0 l ${flip ? 5 : -5} -3.5 l 0 7 Z` : undefined,
-    };
-  }
-
-  if (kind === 'switch') {
-    return {
-      half: 16,
-      paths: [
-        'M -16 0 L -10 0',
-        'M 10 0 L 16 0',
-        'M -9 -1 L 9 -9', // the lever, drawn open
-        'M -10 0 a 2.4 2.4 0 1 0 0.1 0',
-        'M 9.9 0 a 2.4 2.4 0 1 0 0.1 0',
-      ],
-    };
-  }
-
-  switch (type) {
-    case 'R':
-      return { half: 24, paths: ['M -24 0 L -19 -9 L -11 9 L -3 -9 L 5 9 L 13 -9 L 19 9 L 24 0'] };
-    case 'C':
-      return { half: 5, paths: ['M -5 -13 L -5 13', 'M 5 -13 L 5 13'] };
-    case 'L':
-      return {
-        half: 22,
-        paths: ['M -22 0 a 5.5 5.5 0 0 1 11 0 a 5.5 5.5 0 0 1 11 0 a 5.5 5.5 0 0 1 11 0 a 5.5 5.5 0 0 1 11 0'],
-      };
-    default: // diode — bar on the cathode side, which flips with the part
-      return {
-        half: 9,
-        paths: [flip ? 'M -8 -10 L -8 10' : 'M 8 -10 L 8 10'],
-        solid: flip ? 'M 8 -10 L 8 10 L -8 0 Z' : 'M -8 -10 L -8 10 L 8 0 Z',
-      };
-  }
-}
-
 /** Row height reserved for a component. */
 function rowHeight(c: SpiceComponent): number {
   const kind = ELEMENTS[c.type].symbol;
@@ -179,14 +126,7 @@ export function layout(parsed: ParseResult): Scene {
 
   const wire = (d: string, net?: string) => wires.push({ kind: 'path', d, net });
   const pin = (net: string, x: number, y: number) => pins.push({ net, x, y });
-  const groundSymbol = (x: number, y: number, net: string) => {
-    grounds.push(
-      { kind: 'path', d: `M ${x} ${y} L ${x} ${y + 11}`, net },
-      { kind: 'path', d: `M ${x - 10} ${y + 11} L ${x + 10} ${y + 11}`, net },
-      { kind: 'path', d: `M ${x - 6} ${y + 15} L ${x + 6} ${y + 15}`, net },
-      { kind: 'path', d: `M ${x - 2.5} ${y + 19} L ${x + 2.5} ${y + 19}`, net },
-    );
-  };
+  const groundSymbol = (x: number, y: number, net: string) => grounds.push(...groundShapes(x, y, net));
   const refdesLabel = (x: number, y: number, text: string, anchor: 'start' | 'middle' = 'middle') =>
     labels.push({ kind: 'text', x, y, text, anchor, size: 12, bold: true });
   const valueLabel = (x: number, y: number, text: string, anchor: 'start' | 'middle' = 'middle') =>
@@ -237,24 +177,10 @@ export function layout(parsed: ParseResult): Scene {
       const isSource = c.type === 'V' || c.type === 'I';
 
       if (isSource) {
-        const r = 17;
-        wire(`M ${lo} ${cy} L ${cx - r} ${cy}`);
-        wire(`M ${cx + r} ${cy} L ${hi} ${cy}`);
-        symbols.push({ kind: 'circle', cx, cy, r });
-        // The first node is the + terminal, so polarity follows the flip.
-        const px = flip ? cx + 8 : cx - 8;
-        const mx = flip ? cx - 8 : cx + 8;
-        if (c.type === 'V') {
-          symbols.push(
-            { kind: 'path', d: `M ${px - 4} ${cy} L ${px + 4} ${cy} M ${px} ${cy - 4} L ${px} ${cy + 4}` },
-            { kind: 'path', d: `M ${mx - 4} ${cy} L ${mx + 4} ${cy}` },
-          );
-        } else {
-          symbols.push(
-            { kind: 'path', d: `M ${mx + (flip ? 3 : -3)} ${cy} L ${px} ${cy}` },
-            { kind: 'path', d: `M ${px} ${cy} l ${flip ? 6 : -6} -4 l 0 8 Z`, filled: true },
-          );
-        }
+        const src = sourceShapes(c.type, cx, cy, flip);
+        wire(`M ${lo} ${cy} L ${cx - src.half} ${cy}`);
+        wire(`M ${cx + src.half} ${cy} L ${hi} ${cy}`);
+        symbols.push(...src.shapes);
       } else {
         const body = horizontalBody(c.type, flip);
         wire(`M ${lo} ${cy} L ${cx - body.half} ${cy}`);
@@ -311,27 +237,7 @@ export function layout(parsed: ParseResult): Scene {
       const [drain, gate, source] = c.nodes;
       const live = c.nodes.slice(0, 3).filter((n) => !isGround(n)).map(xOf);
       const cx = (live.length ? live.reduce((s, v) => s + v, 0) / live.length : MARGIN_L) + 34;
-      const isMos = c.type !== 'Q';
-      const isP = /pmos|pnp|pch/i.test(c.value);
-      const plate = isMos ? -10 : -7; // gate plate
-      const chan = isMos ? -2 : -7;   // channel / base bar
-
-      symbols.push(
-        { kind: 'path', d: `M ${cx - 24} ${cy} L ${cx + plate} ${cy}` },
-        { kind: 'path', d: `M ${cx + plate} ${cy - 15} L ${cx + plate} ${cy + 15}` },
-      );
-      if (isMos) symbols.push({ kind: 'path', d: `M ${cx + chan} ${cy - 15} L ${cx + chan} ${cy + 15}` });
-      symbols.push(
-        { kind: 'path', d: `M ${cx + chan} ${cy + (isMos ? -11 : -6)} L ${cx + 10} ${cy - 22} L ${cx + 10} ${cy - 32}` },
-        { kind: 'path', d: `M ${cx + chan} ${cy + (isMos ? 11 : 6)} L ${cx + 10} ${cy + 22} L ${cx + 10} ${cy + 32}` },
-        {
-          kind: 'path',
-          filled: true,
-          d: isP
-            ? `M ${cx + chan + 2.5} ${cy + (isMos ? 8.5 : 3.5)} l 8 6 l -8.5 2 Z`
-            : `M ${cx + 4.5} ${cy + 17} l -1 -8.5 l 7.5 5 Z`,
-        },
-      );
+      symbols.push(...transistorShapes(c, cx, cy));
 
       // Drain above, source below; each routes out then across to its rail.
       for (const [net, dy] of [[drain, -32], [source, 32]] as const) {
@@ -471,4 +377,3 @@ function translate(d: string, dx: number, dy: number): string {
 }
 
 const round = (n: number): number => Math.round(n * 100) / 100;
-const truncate = (s: string, n: number): string => (s.length > n ? s.slice(0, n - 1) + '…' : s);
