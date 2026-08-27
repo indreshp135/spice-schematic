@@ -68,3 +68,19 @@ test('importing the core never pulls in elkjs', async () => {
   const core = readFileSync('dist/index.js', 'utf8');
   assert.ok(!/elkjs/.test(core), 'elkjs leaked into the core bundle');
 });
+
+test('a sense net never lands on a terminal port', async () => {
+  // Hanging control inputs off the terminals joins the sensed net to the
+  // output net — a connection the netlist does not contain.
+  const parsed = parseSpice('V1 in 0 AC 1\nE1 out 0 in 0 10\nR1 out 0 1k');
+  const scene = await layoutWithElk(parsed);
+  const dashed = scene.shapes.filter((s) => s.kind === 'path' && s.dashed);
+  assert.ok(dashed.length > 0, 'control tap not drawn as a sense connection');
+});
+
+test('switches route their control net separately too', async () => {
+  const parsed = parseSpice('V1 s 0 DC 5\nVC ctrl 0 DC 1\nS1 s out ctrl 0 swmod\nR1 out 0 1k');
+  const scene = await layoutWithElk(parsed);
+  assert.ok(scene.shapes.some((s) => s.kind === 'path' && s.dashed), 'switch control not drawn dashed');
+  assert.ok(!/NaN/.test(JSON.stringify(scene.shapes)));
+});

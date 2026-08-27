@@ -20,7 +20,9 @@ const esc = (s: string): string =>
 /** Serialise a laid-out scene to standalone SVG markup. */
 export function sceneToSvg(scene: Scene, options: SvgOptions = {}): string {
   const t = { ...defaultTheme, ...options.theme };
-  const hot = options.highlightNet;
+  // Net names are folded to lower case when parsed, so a caller passing the
+  // spelling from their netlist must still match.
+  const hot = options.highlightNet?.toLowerCase();
   const parts: string[] = [];
 
   const colourOf = (s: Shape, base: string): string =>

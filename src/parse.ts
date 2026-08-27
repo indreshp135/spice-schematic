@@ -9,12 +9,28 @@ export const isGround = (net: string): boolean => net === '0' || /^gnd!?$/i.test
 const isParam = (t: string): boolean => t.includes('=') || t.startsWith('{') || t.startsWith('(');
 
 /**
+ * Strip an in-line comment. ngspice ends a card at `;` or at `$` preceded by
+ * whitespace; everything after is prose. Left unstripped it is split into
+ * fields like any other text, which invents nets — `Q1 c b e 2N3904 ; note`
+ * otherwise reads 2N3904 as the substrate terminal.
+ *
+ * Full-line `*` comments are handled by the caller and must not pass here,
+ * since their text is the deck title.
+ */
+function stripInlineComment(line: string): string {
+  return line.replace(/;.*$/, '').replace(/\s\$.*$/, '');
+}
+
+/**
  * Join `+` continuation lines onto the card they extend.
  * A leading `+` is SPICE's line-continuation marker, not a component.
  */
 function joinContinuations(text: string): string[] {
   const out: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
+  for (const raw of text.split(/\r?\n/)) {
+    // Comments are stripped per physical line, before joining, so a comment on
+    // a continuation cannot swallow the card it continues.
+    const line = raw.trimStart().startsWith('*') ? raw : stripInlineComment(raw);
     if (/^\s*\+/.test(line) && out.length) {
       out[out.length - 1] += ' ' + line.replace(/^\s*\+/, '').trim();
     } else {
@@ -115,6 +131,7 @@ export function parseSpice(text: string): ParseResult {
   const seenNet = new Set<string>();
   let title: string | null = null;
   let depth = 0;
+  let firstCard = true;
 
   const noteNets = (ns: string[]) => {
     for (const n of ns) {
@@ -124,6 +141,13 @@ export function parseSpice(text: string): ParseResult {
       }
     }
   };
+
+  /**
+   * SPICE node names are case-insensitive, so `IN` and `in` are one node.
+   * Folding case here is what stops them becoming two rails and drawing a
+   * circuit that is not connected the way the netlist says it is.
+   */
+  const foldNets = (ns: string[]): string[] => ns.map((n) => n.toLowerCase());
 
   for (const raw of joinContinuations(text)) {
     const line = raw.trim();
@@ -144,6 +168,9 @@ export function parseSpice(text: string): ParseResult {
       depth = Math.max(0, depth - 1);
       continue;
     }
+    // `.end` closes the deck — anything after it is not part of the circuit.
+    // Checked after `.ends`/`.endc`, which it prefixes.
+    if (lower === '.end' || lower.startsWith('.end ')) break;
     if (line.startsWith('.')) continue;
     if (depth > 0) continue;
 
@@ -152,24 +179,42 @@ export function parseSpice(text: string): ParseResult {
     const type = refdes[0]?.toUpperCase() ?? '';
 
     if (!isElementType(type)) {
+      if (firstCard && title === null) {
+        title = line;
+        firstCard = false;
+        continue;
+      }
       skipped.push({ line, reason: `"${type}" is not a SPICE element letter` });
+      firstCard = false;
       continue;
     }
 
     const spec = ELEMENTS[type];
     const split = splitCard(type, spec, f.slice(1));
     if (split.error) {
+      // By SPICE convention the first line of a deck is its title. Claiming it
+      // unconditionally would eat the first component of a pasted fragment, so
+      // it is only taken when the line cannot be read as an element card.
+      if (firstCard && title === null) {
+        title = line;
+        firstCard = false;
+        continue;
+      }
       skipped.push({ line, reason: `${spec.name}: ${split.error}` });
+      firstCard = false;
       continue;
     }
+    firstCard = false;
 
-    noteNets(split.nodes);
-    noteNets(split.sense);
+    const nodes = foldNets(split.nodes);
+    const sense = foldNets(split.sense);
+    noteNets(nodes);
+    noteNets(sense);
     components.push({
       refdes,
       type,
-      nodes: split.nodes,
-      ...(split.sense.length ? { senseNodes: split.sense } : {}),
+      nodes,
+      ...(sense.length ? { senseNodes: sense } : {}),
       ...(split.refs.length ? { refs: split.refs } : {}),
       value: split.value,
       raw: line,

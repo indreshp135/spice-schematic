@@ -6,6 +6,7 @@ import {
   horizontalBody,
   sourceShapes,
   transistorShapes,
+  translatePath,
   truncate,
 } from './symbols.js';
 import type { ParseResult, Scene, Shape, SpiceComponent } from './types.js';
@@ -56,6 +57,8 @@ interface Box {
   cy: number;
   /** Port id, its position on the box, and which node index it carries. */
   ports: { id: string; x: number; y: number; side: 'WEST' | 'EAST' | 'NORTH' | 'SOUTH'; node: number }[];
+  /** Control-input ports, kept separate from the terminals they sit beside. */
+  sense: { id: string; x: number; y: number; side: 'SOUTH'; index: number }[];
 }
 
 function boxOf(c: SpiceComponent): Box {
@@ -71,6 +74,7 @@ function boxOf(c: SpiceComponent): Box {
         { id: 'g', x: 0, y: 32, side: 'WEST', node: 1 },
         { id: 's', x: 34, y: 64, side: 'SOUTH', node: 2 },
       ],
+      sense: [],
     };
   }
 
@@ -85,17 +89,29 @@ function boxOf(c: SpiceComponent): Box {
         side: 'WEST' as const,
         node: i,
       })),
+      sense: [],
     };
   }
 
   // Everything else is a horizontal two-terminal part.
   const w = 96;
+  const senseCount = c.senseNodes?.length ?? 0;
   return {
     w, h: 44, cx: w / 2, cy: 22,
     ports: [
       { id: 'a', x: 0, y: 22, side: 'WEST', node: 0 },
       { id: 'b', x: w, y: 22, side: 'EAST', node: 1 },
     ],
+    // Control inputs get their own ports. Hanging them off the terminals
+    // instead joins the sensed net to the output net — a connection the
+    // netlist does not contain.
+    sense: Array.from({ length: senseCount }, (_, i) => ({
+      id: `sense${i}`,
+      x: 28 + i * 40,
+      y: 44,
+      side: 'SOUTH' as const,
+      index: i,
+    })),
   };
 }
 
@@ -129,8 +145,8 @@ function drawComponent(c: SpiceComponent, box: Box, x: number, y: number): { sym
     symbols.push({ kind: 'path', d: `M ${cx + src.half} ${cy} L ${x + box.w} ${cy}` });
   } else {
     const body = horizontalBody(c.type, false);
-    if (body.solid) symbols.push({ kind: 'path', d: shift(body.solid, cx, cy), filled: true });
-    for (const d of body.paths) symbols.push({ kind: 'path', d: shift(d, cx, cy) });
+    if (body.solid) symbols.push({ kind: 'path', d: translatePath(body.solid, cx, cy), filled: true });
+    for (const d of body.paths) symbols.push({ kind: 'path', d: translatePath(d, cx, cy) });
     symbols.push({ kind: 'path', d: `M ${x} ${cy} L ${cx - body.half} ${cy}` });
     symbols.push({ kind: 'path', d: `M ${cx + body.half} ${cy} L ${x + box.w} ${cy}` });
   }
@@ -139,25 +155,6 @@ function drawComponent(c: SpiceComponent, box: Box, x: number, y: number): { sym
   const caption = c.refs?.length ? `${c.refs[0]}` : c.value;
   if (caption) labels.push({ kind: 'text', x: cx, y: cy + (isSource ? 34 : 28), text: truncate(caption, 20), anchor: 'middle', size: 11, dim: true });
   return { symbols, labels };
-}
-
-/** Move an origin-authored path to an absolute position. */
-function shift(d: string, dx: number, dy: number): string {
-  const t = d.split(/\s+/);
-  const out: string[] = [];
-  let cmd = '';
-  let i = 0;
-  while (i < t.length) {
-    if (/^[A-Za-z]$/.test(t[i])) { cmd = t[i]; out.push(t[i]); i++; continue; }
-    if (cmd === 'M' || cmd === 'L') {
-      out.push(String(Math.round((Number(t[i]) + dx) * 100) / 100), String(Math.round((Number(t[i + 1]) + dy) * 100) / 100));
-      i += 2;
-      continue;
-    }
-    out.push(t[i]);
-    i++;
-  }
-  return out.join(' ');
 }
 
 const PAD = 40;
@@ -179,6 +176,8 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
 
   let groundCount = 0;
   const groundNodes: string[] = [];
+  const sensePins = new Set<string>();
+  const senseEdges = new Set<string>();
 
   drawable.forEach((c) => {
     const box = boxOf(c);
@@ -188,7 +187,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
       width: box.w,
       height: box.h,
       layoutOptions: { 'elk.portConstraints': 'FIXED_POS' },
-      ports: box.ports.map((p) => ({
+      ports: [...box.ports, ...box.sense].map((p) => ({
         id: `${c.refdes}.${p.id}`,
         x: p.x,
         y: p.y,
@@ -217,9 +216,25 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
       }
     });
 
-    // Sense nodes ride along as ordinary connections on the same box.
     (c.senseNodes ?? []).forEach((net, i) => {
-      if (!isGround(net)) addPin(net, `${c.refdes}.${box.ports[Math.min(i, box.ports.length - 1)].id}`);
+      const port = box.sense[i];
+      if (!port) return;
+      const ref = `${c.refdes}.${port.id}`;
+      sensePins.add(ref);
+      if (isGround(net)) {
+        const gid = `gnd${groundCount++}`;
+        groundNodes.push(gid);
+        children.push({
+          id: gid, width: 22, height: 26,
+          layoutOptions: { 'elk.portConstraints': 'FIXED_POS' },
+          ports: [{ id: `${gid}.a`, x: 11, y: 0, width: 1, height: 1, layoutOptions: { 'elk.port.side': 'NORTH' } }],
+        });
+        const eid = `e_${gid}`;
+        senseEdges.add(eid);
+        edges.push({ id: eid, sources: [ref], targets: [`${gid}.a`] });
+      } else {
+        addPin(net, ref);
+      }
     });
   });
 
@@ -228,14 +243,20 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
   for (const [net, refs] of pins) {
     if (refs.length < 2) continue;
     if (refs.length === 2) {
-      edges.push({ id: `e${edgeId++}`, sources: [refs[0]], targets: [refs[1]] });
+      const id = `e${edgeId++}`;
+      if (refs.some((r) => sensePins.has(r))) senseEdges.add(id);
+      edges.push({ id, sources: [refs[0]], targets: [refs[1]] });
     } else {
       // ELK routes edges, not hyperedges, so a shared net becomes a junction
       // node with a spoke to each pin.
       const jid = `j_${net}`;
       junctions.push(jid);
       children.push({ id: jid, width: 6, height: 6 });
-      for (const r of refs) edges.push({ id: `e${edgeId++}`, sources: [r], targets: [jid] });
+      for (const r of refs) {
+        const id = `e${edgeId++}`;
+        if (sensePins.has(r)) senseEdges.add(id);
+        edges.push({ id, sources: [r], targets: [jid] });
+      }
     }
   }
 
@@ -287,7 +308,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
     for (const sec of e.sections ?? []) {
       const pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint];
       const d = pts.map((p, i) => `${i ? 'L' : 'M'} ${p.x + PAD} ${p.y + PAD}`).join(' ');
-      wires.push({ kind: 'path', d });
+      wires.push({ kind: 'path', d, ...(senseEdges.has(e.id) ? { dashed: true } : {}) });
     }
   }
 

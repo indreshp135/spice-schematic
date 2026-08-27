@@ -34,10 +34,16 @@ export const Schematic = React.forwardRef<SVGSVGElement, SchematicProps>(functio
   const parsed = React.useMemo(() => parseSpice(netlist), [netlist]);
   const scene = React.useMemo(() => layout(parsed), [parsed]);
 
-  React.useEffect(() => { onParse?.(parsed); }, [parsed, onParse]);
+  // Held in a ref so an inline callback — the common case — does not re-fire
+  // the effect on every render.
+  const onParseRef = React.useRef(onParse);
+  React.useEffect(() => { onParseRef.current = onParse; });
+  React.useEffect(() => { onParseRef.current?.(parsed); }, [parsed]);
 
   const t = { ...defaultTheme, ...theme };
   const interactive = Boolean(onNetHover || onNetClick);
+  // Net names are folded to lower case when parsed.
+  const hot = highlightNet?.toLowerCase();
 
   return (
     <svg
@@ -48,7 +54,7 @@ export const Schematic = React.forwardRef<SVGSVGElement, SchematicProps>(functio
     >
       <rect width={scene.width} height={scene.height} fill={t.paper} />
       {scene.shapes.map((s, i) => {
-        const hot = highlightNet !== undefined && s.net === highlightNet;
+        const lit = hot !== undefined && s.net === hot;
         const handlers =
           interactive && s.net
             ? {
@@ -59,7 +65,7 @@ export const Schematic = React.forwardRef<SVGSVGElement, SchematicProps>(functio
               }
             : undefined;
         if (s.kind !== 'text' && s.isHalo) return <Halo key={i} shape={s} theme={t} />;
-        return <ShapeMark key={i} shape={s} theme={t} hot={hot} handlers={handlers} />;
+        return <ShapeMark key={i} shape={s} theme={t} hot={lit} handlers={handlers} />;
       })}
     </svg>
   );

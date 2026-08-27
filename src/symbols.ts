@@ -131,4 +131,36 @@ export function transistorShapes(c: SpiceComponent, cx: number, cy: number): Sha
   return shapes;
 }
 
+/**
+ * Move an origin-authored path to an absolute position.
+ *
+ * Only absolute `M`/`L` coordinate pairs shift. Arc parameters
+ * (`rx ry rot large sweep dx dy`) and lowercase relative commands are copied
+ * through untouched — shifting an arc's radii would deform the symbol.
+ */
+export function translatePath(d: string, dx: number, dy: number): string {
+  const tokens = d.split(/\s+/);
+  const out: string[] = [];
+  let cmd = '';
+  let i = 0;
+  while (i < tokens.length) {
+    if (/^[A-Za-z]$/.test(tokens[i])) {
+      cmd = tokens[i];
+      out.push(tokens[i]);
+      i++;
+      continue;
+    }
+    if (cmd === 'M' || cmd === 'L') {
+      out.push(String(round(Number(tokens[i]) + dx)), String(round(Number(tokens[i + 1]) + dy)));
+      i += 2;
+      continue;
+    }
+    out.push(tokens[i]);
+    i++;
+  }
+  return out.join(' ');
+}
+
+const round = (n: number): number => Math.round(n * 100) / 100;
+
 export const truncate = (s: string, n: number): string => (s.length > n ? s.slice(0, n - 1) + '…' : s);

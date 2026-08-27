@@ -77,7 +77,8 @@ test('subcircuit call takes every field before the model name as a node', () => 
 });
 
 test('reports malformed lines instead of dropping them silently', () => {
-  const r = parseSpice('123 a b c\nR1\nR2 a 0 1k');
+  // Line 1 is the title by SPICE convention, so the bad cards go below it.
+  const r = parseSpice('* deck\n123 a b c\nR1\nR2 a 0 1k');
   assert.equal(r.components.length, 1);
   assert.equal(r.skipped.length, 2);
   assert.match(r.skipped[0].reason, /not a SPICE element letter/);

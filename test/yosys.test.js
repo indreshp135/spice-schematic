@@ -46,11 +46,25 @@ test('nets become distinct integer bits, skipping the reserved 0 and 1', () => {
   assert.equal(new Set(Object.values(r.bits)).size, Object.keys(r.bits).length);
 });
 
+test('a terminal with no pin on the symbol is reported, not dropped in silence', () => {
+  // The skin's BJT has C, B and E but no substrate pin.
+  const r = toYosysJson('Q1 c b e sub 2N3904');
+  assert.deepEqual(Object.keys(cellsOf(r).Q1.connections), ['C', 'B', 'E']);
+  assert.equal(r.dropped.length, 1);
+  assert.equal(r.dropped[0].refdes, 'Q1');
+  assert.match(r.dropped[0].reason, /terminal "sub" has no pin/);
+  // A card that fits loses nothing and reports nothing.
+  assert.equal(toYosysJson('Q1 c b e 2N3904').dropped.length, 0);
+});
+
 test('undrawable devices are reported, never silently omitted', () => {
   const r = toYosysJson(read('all-elements.cir'));
   const parsed = parseSpice(read('all-elements.cir'));
-  const kept = Object.values(cellsOf(r)).filter((c) => c.type !== 'gnd').length;
-  assert.equal(kept + r.dropped.length, parsed.components.length, 'a component vanished');
+  const kept = new Set(Object.keys(cellsOf(r)).filter((n) => cellsOf(r)[n].type !== 'gnd'));
+  const reported = new Set(r.dropped.map((d) => d.refdes));
+  for (const c of parsed.components) {
+    assert.ok(kept.has(c.refdes) || reported.has(c.refdes), `${c.refdes} vanished without a report`);
+  }
   const droppedTypes = new Set(r.dropped.map((d) => d.type));
   for (const t of ['M', 'J', 'Z', 'E', 'G', 'F', 'H', 'B', 'S', 'W', 'T', 'X', 'K']) {
     assert.ok(droppedTypes.has(t), `${t} should be reported as undrawable`);

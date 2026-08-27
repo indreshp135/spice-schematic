@@ -30,7 +30,11 @@ export interface YosysDropped {
 
 export interface YosysResult {
   json: YosysJson;
-  /** Components with no symbol in the analog skin. Never silently omitted. */
+  /**
+   * Everything the analog skin could not represent — whole components with no
+   * symbol, and individual terminals with no pin on the symbol used. Nothing
+   * is ever lost without an entry here.
+   */
   dropped: YosysDropped[];
   /** Net name to the integer "bit" it was assigned. */
   bits: Record<string, number>;
@@ -94,6 +98,17 @@ export function toYosysJson(input: string | ParseResult, options: YosysOptions =
 
     const connections: Record<string, number[]> = {};
     const port_directions: Record<string, 'input' | 'output'> = {};
+
+    // A symbol may have fewer pins than the card has terminals — the skin's
+    // BJT carries C, B and E but no substrate. Report the loss rather than
+    // letting a connection disappear.
+    for (const extra of c.nodes.slice(skin.ports.length)) {
+      dropped.push({
+        refdes: c.refdes,
+        type: c.type,
+        reason: `terminal "${extra}" has no pin on the ${skin[orient]} symbol`,
+      });
+    }
 
     c.nodes.slice(0, skin.ports.length).forEach((net, i) => {
       const port = skin.ports[i];

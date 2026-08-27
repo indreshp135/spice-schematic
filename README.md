@@ -81,11 +81,23 @@ mistaken for a current-carrying wire. Current-controlled devices (`F`, `H`, `W`)
 name a controlling source instead, and `K` has no nodes at all — it links two
 inductors, so it renders as an annotation rather than a symbol on a rail.
 
-Line continuations (`+`), comments, and `.directives` are handled.
-`.subckt`/`.ends` and `.control`/`.endc` bodies are skipped — their contents are
-definitions and commands, not circuit elements, and drawing them invents nets
-that do not exist. Anything the parser cannot place is reported in `skipped`
-rather than dropped in silence.
+### Netlist semantics
+
+- **Node names are case-insensitive**, as SPICE defines them — `IN` and `in` are
+  one node, not two rails
+- **In-line comments** (`;`, and `$` after whitespace) are stripped before a card
+  is split into fields; left in, `Q1 c b e 2N3904 ; note` reads the model name as
+  the substrate terminal
+- **Line continuations** (`+`) are joined, per physical line, so a comment on a
+  continuation cannot swallow the card it continues
+- **`.end` terminates the deck**; `.ends` and `.endc` are not mistaken for it
+- **The first line is the title** by SPICE convention — but only when it cannot be
+  read as an element card, so a pasted fragment keeps its first component
+- **`.subckt`/`.ends` and `.control`/`.endc` bodies are skipped** — their contents
+  are definitions and commands, not circuit elements
+
+Anything the parser cannot place is reported in `skipped` rather than dropped in
+silence.
 
 ## How the layout works
 

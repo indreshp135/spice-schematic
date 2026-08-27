@@ -1,6 +1,6 @@
 import { ELEMENTS } from './elements.js';
 import { isGround } from './parse.js';
-import { groundShapes, horizontalBody, sourceShapes, transistorShapes, truncate } from './symbols.js';
+import { groundShapes, horizontalBody, sourceShapes, transistorShapes, translatePath, truncate } from './symbols.js';
 import type { ParseResult, Scene, Shape, SpiceComponent } from './types.js';
 
 /** Horizontal distance between adjacent net rails. */
@@ -23,7 +23,10 @@ function orderNets(components: SpiceComponent[]): string[] {
   const discovered: string[] = [];
 
   for (const c of components) {
-    const live = c.nodes.filter((n) => !isGround(n));
+    // Sense nodes must be discovered here too. A net reached only through a
+    // control input would otherwise get no column, and its lead would fall
+    // back to the left margin — landing on whichever net owns that column.
+    const live = [...c.nodes, ...(c.senseNodes ?? [])].filter((n) => !isGround(n));
     for (const n of live) {
       if (!adj.has(n)) {
         adj.set(n, new Set());
@@ -185,8 +188,8 @@ export function layout(parsed: ParseResult): Scene {
         const body = horizontalBody(c.type, flip);
         wire(`M ${lo} ${cy} L ${cx - body.half} ${cy}`);
         wire(`M ${cx + body.half} ${cy} L ${hi} ${cy}`);
-        if (body.solid) symbols.push({ kind: 'path', d: translate(body.solid, cx, cy), filled: true });
-        for (const d of body.paths) symbols.push({ kind: 'path', d: translate(d, cx, cy) });
+        if (body.solid) symbols.push({ kind: 'path', d: translatePath(body.solid, cx, cy), filled: true });
+        for (const d of body.paths) symbols.push({ kind: 'path', d: translatePath(d, cx, cy) });
       }
 
       if (isGround(a)) groundSymbol(xa, cy, a); else pin(a, xa, cy);
@@ -352,28 +355,3 @@ export function layout(parsed: ParseResult): Scene {
   };
 }
 
-/**
- * Shift a body path, authored about the origin, to its placement.
- * Uppercase M/L take coordinate pairs that move; arc radii and lowercase
- * relative deltas must be left exactly as written.
- */
-function translate(d: string, dx: number, dy: number): string {
-  const tokens = d.split(/\s+/);
-  const out: string[] = [];
-  let cmd = '';
-  let i = 0;
-  while (i < tokens.length) {
-    const t = tokens[i];
-    if (/^[A-Za-z]$/.test(t)) { cmd = t; out.push(t); i++; continue; }
-    if (cmd === 'M' || cmd === 'L') {
-      out.push(String(round(Number(tokens[i]) + dx)), String(round(Number(tokens[i + 1]) + dy)));
-      i += 2;
-      continue;
-    }
-    out.push(t);
-    i++;
-  }
-  return out.join(' ');
-}
-
-const round = (n: number): number => Math.round(n * 100) / 100;
