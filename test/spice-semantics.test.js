@@ -151,3 +151,23 @@ test('no two nets are drawn on the same column at overlapping rows', () => {
     }
   }
 });
+
+test('expression-form controlled sources keep two terminals and invent nothing', () => {
+  // Control nodes in POLY/VALUE/TABLE cannot be told from coefficients without
+  // evaluating the expression, so they are not drawn — but nothing false is.
+  for (const card of [
+    'E1 out 0 POLY(2) n1 n2 n3 n4 0 1 1',
+    'E1 out 0 VALUE={V(a)*2}',
+    'G1 out 0 TABLE {V(in)} = (0 0) (1 1)',
+  ]) {
+    const r = parseSpice(card);
+    assert.deepEqual(r.components[0].nodes, [card[0] === 'E' ? 'out' : 'out', '0']);
+    assert.equal(r.components[0].senseNodes, undefined);
+    assert.deepEqual(r.nets, ['out'], `invented nets from: ${card}`);
+  }
+});
+
+test('numeric and hierarchical node names survive intact', () => {
+  assert.deepEqual(parseSpice('R1 1 2 1k\nR2 2 0 1k').nets, ['1', '2']);
+  assert.deepEqual(parseSpice('R1 x.a x.b 1k').nets, ['x.a', 'x.b']);
+});

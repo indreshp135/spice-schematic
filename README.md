@@ -99,6 +99,12 @@ inductors, so it renders as an annotation rather than a symbol on a rail.
 Anything the parser cannot place is reported in `skipped` rather than dropped in
 silence.
 
+One known gap: controlled sources written in the `POLY`, `VALUE` or `TABLE` forms
+carry two terminals plus an expression, and their control nodes cannot be told
+apart from coefficients without evaluating the expression. Those nets are not
+drawn. Nothing false is drawn either — the two terminals are correct — but the
+sheet is missing a connection the netlist has.
+
 ## How the layout works
 
 A netlist records connectivity and nothing else. There are no coordinates in it, so a renderer has to invent a placement:
