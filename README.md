@@ -249,7 +249,7 @@ npm test        # 340 tests: SPICE semantics, all 26 elements, geometry,
 npm run demo    # Vite playground — paste a netlist, watch it draw
 ```
 
-The playground is published to GitHub Pages from the `gh-pages` branch.
+The playground is published to GitHub Pages from `main`/`docs`.
 Rebuild and republish it with `./scripts/deploy-pages.sh`.
 
 ## License
