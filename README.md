@@ -244,7 +244,8 @@ was built for — 50 nets fold into a handful of columns instead of 50.
 ```bash
 npm install
 npm run build
-npm test        # 152 tests: elements, geometry, SVG validity, demo UI
+npm test        # 329 tests: SPICE semantics, all 26 elements, geometry,
+                #            SVG validity, renderer parity, hostile input
 npm run demo    # Vite playground — paste a netlist, watch it draw
 ```
 
