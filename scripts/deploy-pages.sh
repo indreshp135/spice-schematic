@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the demo and publish it to the gh-pages branch.
-# Requires push access; GitHub Pages serves gh-pages at /SPICE-res/.
+# Requires push access; GitHub Pages serves gh-pages at /spice-schematic/.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,4 +19,4 @@ git add -A
 git commit -q -m "Deploy demo to GitHub Pages"
 git push -q --force "$(git -C "$root" remote get-url origin)" gh-pages
 
-echo "deployed -> https://indreshp135.github.io/SPICE-res/"
+echo "deployed -> https://indreshp135.github.io/spice-schematic/"

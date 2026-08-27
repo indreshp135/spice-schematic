@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:pages": "vite build --base=/SPICE-res/"
+    "build:pages": "vite build --base=/spice-schematic/"
   },
   "dependencies": {
     "react": "^18.3.1",

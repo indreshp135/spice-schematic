@@ -2,7 +2,7 @@
 
 Turn a SPICE netlist into a schematic — as a React component, or as a plain SVG string with no DOM in sight.
 
-**[Try it in the browser →](https://indreshp135.github.io/SPICE-res/)** — paste a netlist, watch it draw, download the SVG.
+**[Try it in the browser →](https://indreshp135.github.io/spice-schematic/)** — paste a netlist, watch it draw, download the SVG.
 
 ```bash
 npm install spice-schematic

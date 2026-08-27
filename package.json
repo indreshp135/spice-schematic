@@ -16,10 +16,10 @@
   "author": "indreshp135",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/indreshp135/SPICE-res.git"
+    "url": "git+https://github.com/indreshp135/spice-schematic.git"
   },
-  "homepage": "https://github.com/indreshp135/SPICE-res#readme",
-  "bugs": "https://github.com/indreshp135/SPICE-res/issues",
+  "homepage": "https://github.com/indreshp135/spice-schematic#readme",
+  "bugs": "https://github.com/indreshp135/spice-schematic/issues",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
