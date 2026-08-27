@@ -99,7 +99,12 @@ inductors, so it renders as an annotation rather than a symbol on a rail.
 Anything the parser cannot place is reported in `skipped` rather than dropped in
 silence.
 
-One known gap: controlled sources written in the `POLY`, `VALUE` or `TABLE` forms
+Two known gaps. A MOSFET bulk or BJT substrate terminal has no pin on the
+three-terminal symbol used, so a bulk tied to its own net is not drawn — it stays
+in `ParseResult.nets` but is absent from `Scene.nets`, which lists only what
+reached the sheet.
+
+And controlled sources written in the `POLY`, `VALUE` or `TABLE` forms
 carry two terminals plus an expression, and their control nodes cannot be told
 apart from coefficients without evaluating the expression. Those nets are not
 drawn. Nothing false is drawn either — the two terminals are correct — but the

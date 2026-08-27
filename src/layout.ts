@@ -337,7 +337,10 @@ export function layout(parsed: ParseResult): Scene {
     width: maxX + MARGIN_R,
     height: Math.max(y + MARGIN_B, MARGIN_T + 120),
     title: parsed.title,
-    nets,
+    // Only nets that reached a pin. A terminal with no pin on its symbol —
+    // a MOSFET bulk, a BJT substrate — draws nothing, so its net must not be
+    // advertised as being on the sheet.
+    nets: nets.filter((n) => byNet.has(n)),
     // Symbols sit on a paper-coloured backing so a rail passing behind one is
     // interrupted rather than appearing to terminate on it; junction dots stay
     // the only mark meaning "connected". The whole backing is laid down as one

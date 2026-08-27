@@ -64,6 +64,12 @@ export interface Scene {
   width: number;
   height: number;
   title: string | null;
+  /**
+   * Nets actually drawn on this sheet, in reading order. A net the netlist
+   * mentions but no symbol has a pin for — a MOSFET bulk terminal, say —
+   * is absent, because listing it would promise a mark that is not there.
+   * Use `ParseResult.nets` for everything the netlist names.
+   */
   nets: string[];
   shapes: Shape[];
 }

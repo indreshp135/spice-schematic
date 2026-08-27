@@ -171,3 +171,33 @@ test('numeric and hierarchical node names survive intact', () => {
   assert.deepEqual(parseSpice('R1 1 2 1k\nR2 2 0 1k').nets, ['1', '2']);
   assert.deepEqual(parseSpice('R1 x.a x.b 1k').nets, ['x.a', 'x.b']);
 });
+
+test('Scene.nets lists only nets actually drawn', () => {
+  // A MOSFET bulk or BJT substrate has no pin on the three-terminal symbol.
+  // Advertising its net promises a mark that is not on the sheet — a consumer
+  // building a legend or highlighting from Scene.nets would get nothing.
+  const parsed = parseSpice('M1 d g s bulk NMOS\nQ1 c b e sub 2N3904');
+  const scene = layout(parsed);
+
+  assert.ok(parsed.nets.includes('bulk'), 'the netlist does name it');
+  assert.ok(!scene.nets.includes('bulk'), 'the sheet must not claim it');
+  assert.ok(!scene.nets.includes('sub'));
+
+  // Everything Scene.nets does list must have at least one mark.
+  for (const net of scene.nets) {
+    assert.ok(scene.shapes.some((s) => s.net === net), `${net} listed but never drawn`);
+  }
+});
+
+test('every drawn net across all examples has a mark', () => {
+  for (const deck of [
+    'V1 in 0 DC 5\nR1 in out 1k\nC1 out 0 100n',
+    'V1 a 0 DC 5\nQ1 c b e NPN\nR1 a c 1k\nR2 b 0 1k\nR3 e 0 1k',
+    'V1 in 0 AC 1\nE1 out 0 in 0 10\nR1 out 0 1k',
+  ]) {
+    const scene = layout(parseSpice(deck));
+    for (const net of scene.nets) {
+      assert.ok(scene.shapes.some((s) => s.net === net), `${net} listed but never drawn`);
+    }
+  }
+});

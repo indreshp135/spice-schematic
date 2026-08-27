@@ -238,6 +238,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
     });
   });
 
+  const drawnNets = new Set(pins.keys());
   const junctions: string[] = [];
   let edgeId = 0;
   for (const [net, refs] of pins) {
@@ -332,7 +333,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
     width: (laid.width ?? 0) + PAD * 2,
     height: noteY + 24,
     title: parsed.title,
-    nets: parsed.nets,
+    nets: parsed.nets.filter((n) => drawnNets.has(n)),
     shapes: [
       ...wires,
       ...dots,
