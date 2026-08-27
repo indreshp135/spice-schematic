@@ -84,3 +84,72 @@ test('switches route their control net separately too', async () => {
   assert.ok(scene.shapes.some((s) => s.kind === 'path' && s.dashed), 'switch control not drawn dashed');
   assert.ok(!/NaN/.test(JSON.stringify(scene.shapes)));
 });
+
+/* ── property sweep, mirroring the rail layout's invariants ───────────── */
+
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0x100000000);
+}
+
+function deckFor(seed) {
+  const r = rng(seed);
+  const pool = ['0', ...Array.from({ length: 2 + Math.floor(r() * 6) }, (_, i) => `n${i}`)];
+  const pick = () => pool[Math.floor(r() * pool.length)];
+  const kinds = [
+    (i) => `R${i} ${pick()} ${pick()} 1k`,
+    (i) => `C${i} ${pick()} ${pick()} 1n`,
+    (i) => `V${i} ${pick()} ${pick()} DC 5`,
+    (i) => `Q${i} ${pick()} ${pick()} ${pick()} NPN`,
+    (i) => `M${i} ${pick()} ${pick()} ${pick()} ${pick()} NMOS`,
+    (i) => `E${i} ${pick()} ${pick()} ${pick()} ${pick()} 10`,
+    (i) => `S${i} ${pick()} ${pick()} ${pick()} ${pick()} swmod`,
+    (i) => `X${i} ${pick()} ${pick()} ${pick()} sub`,
+    (i) => `K${i} L${i}a L${i}b 0.9`,
+  ];
+  const n = 1 + Math.floor(r() * 8);
+  return ['* generated', ...Array.from({ length: n }, (_, i) => kinds[Math.floor(r() * kinds.length)](i))].join('\n');
+}
+
+test('ELK holds the same invariants over generated decks', async () => {
+  for (const seed of Array.from({ length: 25 }, (_, i) => i * 7919 + 13)) {
+    const deck = deckFor(seed);
+    const parsed = parseSpice(deck);
+    const scene = await layoutWithElk(parsed);
+    const where = `seed ${seed}`;
+
+    assert.ok(Number.isFinite(scene.width) && scene.width > 0, `${where}: bad width`);
+    assert.ok(Number.isFinite(scene.height) && scene.height > 0, `${where}: bad height`);
+
+    const svg = sceneToSvg(scene);
+    assert.ok(!/NaN|Infinity|undefined/.test(svg), `${where}: non-finite geometry`);
+    assert.match(svg, /<\/svg>$/, `${where}: truncated svg`);
+
+    // Same promise as the rail layout: a listed net must carry a mark.
+    for (const net of scene.nets) {
+      assert.ok(scene.shapes.some((s) => s.net === net), `${where}: ${net} listed but never drawn`);
+    }
+    assert.ok(!scene.nets.includes('0'), `${where}: ground was given a net`);
+  }
+});
+
+test('ELK draws every component the parser accepted', async () => {
+  for (const seed of Array.from({ length: 15 }, (_, i) => i * 104729 + 5)) {
+    const deck = deckFor(seed);
+    const parsed = parseSpice(deck);
+    const svg = sceneToSvg(await layoutWithElk(parsed));
+    for (const c of parsed.components) {
+      assert.ok(svg.includes(c.refdes), `seed ${seed}: ${c.refdes} (${c.type}) parsed but never drawn`);
+    }
+  }
+});
+
+test('ELK wires carry their net, so highlighting works there too', async () => {
+  // Untagged, highlightNet and onNetHover silently do nothing in this layout
+  // while working in the other — the Scene contract says a mark carries the
+  // net it belongs to.
+  const scene = await layoutWithElk(parseSpice('V1 in 0 DC 5\nR1 in out 1k\nR2 out 0 1k'));
+  assert.ok(scene.shapes.filter((s) => s.net).length > 0, 'no shape carries a net');
+  assert.ok(sceneToSvg(scene, { highlightNet: 'out' }).includes('#2f5da8'), 'highlight had no effect');
+  assert.ok(!sceneToSvg(scene).includes('#2f5da8'), 'accent colour appears without a highlight');
+});

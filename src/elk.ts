@@ -176,8 +176,12 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
 
   let groundCount = 0;
   const groundNodes: string[] = [];
+  const groundNet = new Map<string, string>();
   const sensePins = new Set<string>();
   const senseEdges = new Set<string>();
+  // Which net each edge carries, so wires can be tagged the way the rail
+  // layout tags them — highlighting and hover both read Shape.net.
+  const edgeNet = new Map<string, string>();
 
   drawable.forEach((c) => {
     const box = boxOf(c);
@@ -205,11 +209,13 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
         // gets its own symbol, exactly as the rail layout does.
         const gid = `gnd${groundCount++}`;
         groundNodes.push(gid);
+        groundNet.set(gid, net);
         children.push({
           id: gid, width: 22, height: 26,
           layoutOptions: { 'elk.portConstraints': 'FIXED_POS' },
           ports: [{ id: `${gid}.a`, x: 11, y: 0, width: 1, height: 1, layoutOptions: { 'elk.port.side': 'NORTH' } }],
         });
+        edgeNet.set(`e_${gid}`, net);
         edges.push({ id: `e_${gid}`, sources: [`${c.refdes}.${p.id}`], targets: [`${gid}.a`] });
       } else {
         addPin(net, `${c.refdes}.${p.id}`);
@@ -224,6 +230,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
       if (isGround(net)) {
         const gid = `gnd${groundCount++}`;
         groundNodes.push(gid);
+        groundNet.set(gid, net);
         children.push({
           id: gid, width: 22, height: 26,
           layoutOptions: { 'elk.portConstraints': 'FIXED_POS' },
@@ -231,6 +238,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
         });
         const eid = `e_${gid}`;
         senseEdges.add(eid);
+        edgeNet.set(eid, net);
         edges.push({ id: eid, sources: [ref], targets: [`${gid}.a`] });
       } else {
         addPin(net, ref);
@@ -238,7 +246,8 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
     });
   });
 
-  const drawnNets = new Set(pins.keys());
+  // A net with one pin has no edge, so nothing on the sheet carries it.
+  const drawnNets = new Set([...pins].filter(([, refs]) => refs.length >= 2).map(([net]) => net));
   const junctions: string[] = [];
   let edgeId = 0;
   for (const [net, refs] of pins) {
@@ -246,6 +255,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
     if (refs.length === 2) {
       const id = `e${edgeId++}`;
       if (refs.some((r) => sensePins.has(r))) senseEdges.add(id);
+      edgeNet.set(id, net);
       edges.push({ id, sources: [refs[0]], targets: [refs[1]] });
     } else {
       // ELK routes edges, not hyperedges, so a shared net becomes a junction
@@ -256,6 +266,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
       for (const r of refs) {
         const id = `e${edgeId++}`;
         if (sensePins.has(r)) senseEdges.add(id);
+        edgeNet.set(id, net);
         edges.push({ id, sources: [r], targets: [jid] });
       }
     }
@@ -298,7 +309,7 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
 
   for (const gid of groundNodes) {
     const n = at.get(gid);
-    if (n) grounds.push(...groundShapes((n.x ?? 0) + PAD + 11, (n.y ?? 0) + PAD, '0'));
+    if (n) grounds.push(...groundShapes((n.x ?? 0) + PAD + 11, (n.y ?? 0) + PAD, groundNet.get(gid) ?? '0'));
   }
   for (const jid of junctions) {
     const n = at.get(jid);
@@ -309,7 +320,13 @@ export async function layoutWithElk(parsed: ParseResult, options: ElkLayoutOptio
     for (const sec of e.sections ?? []) {
       const pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint];
       const d = pts.map((p, i) => `${i ? 'L' : 'M'} ${p.x + PAD} ${p.y + PAD}`).join(' ');
-      wires.push({ kind: 'path', d, ...(senseEdges.has(e.id) ? { dashed: true } : {}) });
+      const net = edgeNet.get(e.id);
+      wires.push({
+        kind: 'path',
+        d,
+        ...(net ? { net } : {}),
+        ...(senseEdges.has(e.id) ? { dashed: true } : {}),
+      });
     }
   }
 
